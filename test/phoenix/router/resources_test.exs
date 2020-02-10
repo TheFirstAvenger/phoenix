@@ -32,7 +32,7 @@ defmodule Phoenix.Router.ResourcesTest do
   end
 
   defmodule Router do
-    use Phoenix.Router
+    use Phoenix.Router, trailing_slash: true
 
     resources "/users", UserController, alias: Api do
       resources "/comments", CommentController do
@@ -245,7 +245,7 @@ defmodule Phoenix.Router.ResourcesTest do
     assert conn.params["slug"] == "foo"
     assert conn.resp_body == "show users"
     assert Router.Helpers.admin_path(conn, :show, "foo") ==
-           "/admin/foo"
+           "/admin/foo/"
 
     conn = call(Router, :get, "admin/bar/comments/the_key")
     assert conn.status == 200
@@ -253,7 +253,7 @@ defmodule Phoenix.Router.ResourcesTest do
     assert conn.params["key"] == "the_key"
     assert conn.resp_body == "show comments"
     assert Router.Helpers.admin_post_path(conn, :show, "bar", "the_key") ==
-           "/admin/bar/comments/the_key"
+           "/admin/bar/comments/the_key/"
   end
 
   test "resources with :only sets proper match order for :show and :new" do

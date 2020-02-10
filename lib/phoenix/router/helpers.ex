@@ -14,24 +14,28 @@ defmodule Phoenix.Router.Helpers do
   @doc """
   Callback invoked by the url generated in each helper module.
   """
-  def url(_router, %Conn{private: private}) do
+  def url(router, %Conn{private: private}) do
     case private do
       %{phoenix_router_url: %URI{} = uri} -> URI.to_string(uri)
       %{phoenix_router_url: url} when is_binary(url) -> url
       %{phoenix_endpoint: endpoint} -> endpoint.url()
     end
+    |> trailing_slash(router)
   end
 
-  def url(_router, %_{endpoint: endpoint}) do
+  def url(router, %_{endpoint: endpoint}) do
     endpoint.url()
+    |> trailing_slash(router)
   end
 
-  def url(_router, %URI{} = uri) do
+  def url(router, %URI{} = uri) do
     URI.to_string(%{uri | path: nil})
+    |> trailing_slash(router)
   end
 
-  def url(_router, endpoint) when is_atom(endpoint) do
+  def url(router, endpoint) when is_atom(endpoint) do
     endpoint.url()
+    |> trailing_slash(router)
   end
 
   def url(router, other) do
@@ -47,19 +51,22 @@ defmodule Phoenix.Router.Helpers do
     conn
     |> build_own_forward_path(router, path)
     |> Kernel.||(build_conn_forward_path(conn, router, path))
-    |> Kernel.||(path_with_script(path, conn.script_name))
+    |> Kernel.||(path_with_script(path, router, conn.script_name))
   end
 
-  def path(_router, %URI{} = uri, path) do
+  def path(router, %URI{} = uri, path) do
     (uri.path || "") <> path
+    |> trailing_slash(router)
   end
 
-  def path(_router, %_{endpoint: endpoint}, path) do
+  def path(router, %_{endpoint: endpoint}, path) do
     endpoint.path(path)
+    |> trailing_slash(router)
   end
 
-  def path(_router, endpoint, path) when is_atom(endpoint) do
+  def path(router, endpoint, path) when is_atom(endpoint) do
     endpoint.path(path)
+    |> trailing_slash(router)
   end
 
   def path(router, other, _path) do
@@ -73,7 +80,7 @@ defmodule Phoenix.Router.Helpers do
   defp build_own_forward_path(conn, router, path) do
     case Map.fetch(conn.private, router) do
       {:ok, {local_script, _}} ->
-        path_with_script(path, local_script)
+        path_with_script(path, router, local_script)
       :error -> nil
     end
   end
@@ -83,7 +90,7 @@ defmodule Phoenix.Router.Helpers do
       {:ok, {script_name, forwards}} ->
         case Map.fetch(forwards, router) do
           {:ok, local_script} ->
-            path_with_script(path, script_name ++ local_script)
+            path_with_script(path, router, script_name ++ local_script)
           :error -> nil
         end
       :error -> nil
@@ -91,13 +98,34 @@ defmodule Phoenix.Router.Helpers do
   end
   defp build_conn_forward_path(_conn, _router, _path), do: nil
 
-  defp path_with_script(path, []) do
+  defp path_with_script(path, router, []) do
     path
-  end
-  defp path_with_script(path, script) do
-    "/" <> Enum.join(script, "/") <> path
+    |> trailing_slash(router)
   end
 
+  defp path_with_script(path, router, script) do
+    "/" <> Enum.join(script, "/") <> path
+    |> trailing_slash(router)
+  end
+
+  defp trailing_slash(path, router) do
+    if !function_exported?(router, :trailing_slash, 0) or !router.trailing_slash() do
+      path
+    else
+      case String.split(path, "?") do
+        [path] -> trailing_slash_if_missing(path)
+        [path | querystring] -> trailing_slash_if_missing(path) <> "?" <> Enum.join(querystring, "&")
+      end
+    end
+  end
+
+  defp trailing_slash_if_missing(path) do
+    if String.ends_with?(path, "\/") do
+      path
+    else
+      path <> "/"
+    end
+  end
   @doc """
   Generates the helper module for the given environment and routes.
   """

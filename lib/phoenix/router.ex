@@ -262,10 +262,13 @@ defmodule Phoenix.Router do
   end
 
   defp prelude(opts) do
+    trailing_slash = Keyword.get(opts, :trailing_slash, false)
     quote do
       @helpers_moduledoc Keyword.get(unquote(opts), :helpers_moduledoc, true)
 
       Module.register_attribute __MODULE__, :phoenix_routes, accumulate: true
+      @trailing_slash unquote(trailing_slash)
+      def trailing_slash, do: @trailing_slash
       @phoenix_forwards %{}
 
       import Phoenix.Router
